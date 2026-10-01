@@ -34,7 +34,23 @@ class GameEngine:
                     self.last_key = event.key
         
     def update(self):
-        if self.game_state != "PLAYING":
+        self.rope.update()
+
+        # Update puller leaning animations based on rope velocity and game state
+        if self.game_state == "PLAYING":
+            # Player leans backward (left, negative) when pulling; jerked forward (right) when losing ground
+            player_target = max(-14.0, min(8.0, self.rope.velocity * 3.5))
+            # Computer leans backward (right, positive) when pulling; jerked forward (left) when losing ground
+            computer_target = max(-8.0, min(14.0, self.rope.velocity * 3.5))
+            self.player.update(player_target)
+            self.computer.update(computer_target)
+        else:
+            if self.winner == "PLAYER":
+                self.player.update(-12.0)
+                self.computer.update(-12.0)
+            elif self.winner == "COMPUTER":
+                self.player.update(12.0)
+                self.computer.update(12.0)
             return
 
         # Dynamic computer difficulty: panic surge when player gets close to winning
@@ -61,6 +77,8 @@ class GameEngine:
 
     def reset(self):
         self.rope.reset()
+        self.player.reset()
+        self.computer.reset()
         self.last_key = None
         self.winner = None
         self.game_state = "PLAYING"
