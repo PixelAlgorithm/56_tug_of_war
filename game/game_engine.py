@@ -37,9 +37,20 @@ class GameEngine:
         if self.game_state != "PLAYING":
             return
 
+        # Dynamic computer difficulty: panic surge when player gets close to winning
+        cooldown = self.computer_pull_cooldown
+        strength_multiplier = 1.0
+
+        danger_threshold = self.rope.left_win_x + 100
+        if self.rope.marker_x < danger_threshold:
+            danger_factor = (danger_threshold - self.rope.marker_x) / 100.0
+            danger_factor = min(max(danger_factor, 0.0), 1.0)
+            cooldown = self.computer_pull_cooldown - int(danger_factor * 60)
+            strength_multiplier = 1.0 + (danger_factor * 0.25)
+
         now = pygame.time.get_ticks()
-        if now - self.last_computer_pull >= self.computer_pull_cooldown:
-            computer_variance = random.uniform(0.7, 1.2)
+        if now - self.last_computer_pull >= cooldown:
+            computer_variance = random.uniform(0.7, 1.2) * strength_multiplier
             self.rope.pull_right(computer_variance)
             self.last_computer_pull = now
 
