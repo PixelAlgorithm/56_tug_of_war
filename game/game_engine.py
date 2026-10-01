@@ -19,7 +19,12 @@ class GameEngine:
         self.computer_pull_cooldown = 180
         self.last_computer_pull = pygame.time.get_ticks()
 
+        self.match_start_time = pygame.time.get_ticks()
+        self.match_time = 0.0
+        self.sudden_death = False
+
         self.font_big = pygame.font.SysFont(None, 48)
+        self.font_medium = pygame.font.SysFont(None, 32)
         self.font_small = pygame.font.SysFont(None, 26)
 
     def handle_event(self, event):
@@ -30,14 +35,19 @@ class GameEngine:
         if event.type == pygame.KEYDOWN:
             if event.key in (pygame.K_a, pygame.K_d):
                 if event.key != self.last_key:
-                    self.rope.pull_left(1.0)
+                    pull_multiplier = 2.0 if self.sudden_death else 1.0
+                    self.rope.pull_left(pull_multiplier)
                     self.last_key = event.key
         
     def update(self):
         self.rope.update()
 
-        # Update puller leaning animations based on rope velocity and game state
         if self.game_state == "PLAYING":
+            now = pygame.time.get_ticks()
+            self.match_time = (now - self.match_start_time) / 1000.0
+            if self.match_time >= 45.0:
+                self.sudden_death = True
+
             # Player leans backward (left, negative) when pulling; jerked forward (right) when losing ground
             player_target = max(-14.0, min(8.0, self.rope.velocity * 3.5))
             # Computer leans backward (right, positive) when pulling; jerked forward (left) when losing ground
@@ -66,7 +76,8 @@ class GameEngine:
 
         now = pygame.time.get_ticks()
         if now - self.last_computer_pull >= cooldown:
-            computer_variance = random.uniform(0.7, 1.2) * strength_multiplier
+            pull_multiplier = 2.0 if self.sudden_death else 1.0
+            computer_variance = random.uniform(0.7, 1.2) * strength_multiplier * pull_multiplier
             self.rope.pull_right(computer_variance)
             self.last_computer_pull = now
 
@@ -83,6 +94,9 @@ class GameEngine:
         self.winner = None
         self.game_state = "PLAYING"
         self.last_computer_pull = pygame.time.get_ticks()
+        self.match_start_time = pygame.time.get_ticks()
+        self.match_time = 0.0
+        self.sudden_death = False
 
     def render(self, screen):
         screen.fill((30, 32, 36))
@@ -94,10 +108,28 @@ class GameEngine:
         self.player.render(screen)
         self.computer.render(screen)
 
+        # Match Timer display
+        mins = int(self.match_time) // 60
+        secs = int(self.match_time) % 60
+        timer_text = f"TIME: {mins:02d}:{secs:02d}"
+        timer_color = (255, 90, 80) if self.sudden_death else (240, 240, 240)
+        timer_surf = self.font_medium.render(timer_text, True, timer_color)
+        screen.blit(timer_surf, (self.width // 2 - timer_surf.get_width() // 2, 12))
+
+        # Sudden Death indicator or normal instructions
+        if self.sudden_death:
+            sd_surf = self.font_small.render(
+                "⚡ SUDDEN DEATH: 2X PULL DISTANCE! ⚡", True, (255, 80, 80)
+            )
+            screen.blit(sd_surf, (self.width // 2 - sd_surf.get_width() // 2, 38))
+            inst_y = 62
+        else:
+            inst_y = 40
+
         inst_surf = self.font_small.render(
             "Alternate [A] and [D] keys rapidly to pull!", True, (210, 210, 210)
         )
-        screen.blit(inst_surf, (self.width // 2 - inst_surf.get_width() // 2, 40))
+        screen.blit(inst_surf, (self.width // 2 - inst_surf.get_width() // 2, inst_y))
 
         if self.game_state == "GAME_OVER":
             overlay = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
@@ -109,7 +141,15 @@ class GameEngine:
             text_surf = self.font_big.render(win_text, True, color)
             screen.blit(
                 text_surf,
-                (self.width // 2 - text_surf.get_width() // 2, self.height // 2 - 50)
+                (self.width // 2 - text_surf.get_width() // 2, self.height // 2 - 60)
+            )
+
+            final_time_surf = self.font_small.render(
+                f"Final Match Time: {int(self.match_time)}s", True, (200, 200, 200)
+            )
+            screen.blit(
+                final_time_surf,
+                (self.width // 2 - final_time_surf.get_width() // 2, self.height // 2 - 10)
             )
 
             restart_surf = self.font_small.render(
@@ -117,5 +157,5 @@ class GameEngine:
             )
             screen.blit(
                 restart_surf,
-                (self.width // 2 - restart_surf.get_width() // 2, self.height // 2 + 10)
+                (self.width // 2 - restart_surf.get_width() // 2, self.height // 2 + 25)
             )
